@@ -269,7 +269,7 @@ def rewrite_logs(d):
     return new_d
 
 
-def init_deepspeed(trainer, num_training_steps):
+def init_deepspeed(trainer, model, num_training_steps):
     """
     Init DeepSpeed, after converting any relevant Trainer's args into DeepSpeed configuration
 
@@ -283,7 +283,6 @@ def init_deepspeed(trainer, num_training_steps):
 
     args = trainer.args
     ds_config_file = args.deepspeed
-    model = trainer.model
 
     with io.open(ds_config_file, "r", encoding="utf-8") as f:
         config = json.load(f)

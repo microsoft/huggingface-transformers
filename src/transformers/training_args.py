@@ -263,6 +263,8 @@ class TrainingArguments:
         deepspeed (:obj:`str`, `optional`):
             Use `Deepspeed <https://github.com/microsoft/deepspeed>`__. This is an experimental feature and its API may
             evolve in the future. The value is the location of its json config file (usually ``ds_config.json``).
+        ortmodule (:obj:`bool`, `optional`):
+            Use `ORTModule <https://github.com/microsoft/onnxruntime>`__.
         label_smoothing_factor (:obj:`float`, `optional`, defaults to 0.0):
             The label smoothing factor to use. Zero means no label smoothing, otherwise the underlying onehot-encoded
             labels are changed from 0s and 1s to :obj:`label_smoothing_factor/num_labels` and :obj:`1 -
@@ -480,6 +482,10 @@ class TrainingArguments:
     deepspeed: Optional[str] = field(
         default=None,
         metadata={"help": "Enable deepspeed and pass the path to deepspeed json config file (e.g. ds_config.json)"},
+    )
+    ortmodule: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable OrtModule"},
     )
     label_smoothing_factor: float = field(
         default=0.0, metadata={"help": "The label smoothing epsilon to apply (zero means no label smoothing)."}
