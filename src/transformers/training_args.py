@@ -482,9 +482,9 @@ class TrainingArguments:
         default=None,
         metadata={"help": "Enable deepspeed and pass the path to deepspeed json config file (e.g. ds_config.json)"},
     )
-    ortmodule: Optional[bool] = field(
+    ort: Optional[bool] = field(
         default=False,
-        metadata={"help": "Enable OrtModule"},
+        metadata={"help": "Enable Ort"},
     )
     label_smoothing_factor: float = field(
         default=0.0, metadata={"help": "The label smoothing epsilon to apply (zero means no label smoothing)."}
