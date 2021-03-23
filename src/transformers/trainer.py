@@ -1033,6 +1033,10 @@ class Trainer:
             self.control = self.callback_handler.on_epoch_begin(self.args, self.state, self.control)
 
             for step, inputs in enumerate(epoch_iterator):
+                if step > 5:
+                    torch.cuda.cudart().cudaProfilerStart()
+                    os.environ["zhijxu_START_PROFILING"] = "True"
+                    os.environ["zhijxu_STEP"] = str(step)
 
                 # Skip past any already trained steps if resuming training
                 if steps_trained_in_current_epoch > 0:
@@ -1429,6 +1433,11 @@ class Trainer:
             :obj:`torch.Tensor`: The tensor with training loss on this batch.
         """
         model.train()
+
+        if "zhijxu_START_PROFILING" in os.environ:
+            torch.cuda.nvtx.range_push("iteration{}".format(os.environ["zhijxu_STEP"]))
+            torch.cuda.nvtx.range_push("forward")
+
         inputs = self._prepare_inputs(inputs)
 
         if self.use_amp:
@@ -1444,6 +1453,10 @@ class Trainer:
             # deepspeed handles loss scaling by gradient_accumulation_steps in its `backward`
             loss = loss / self.args.gradient_accumulation_steps
 
+        if "zhijxu_START_PROFILING" in os.environ:
+            torch.cuda.nvtx.range_pop()
+            torch.cuda.nvtx.range_push("backward")
+
         if self.use_amp:
             self.scaler.scale(loss).backward()
         elif self.use_apex:
@@ -1454,6 +1467,10 @@ class Trainer:
             loss = self.deepspeed.backward(loss)
         else:
             loss.backward()
+
+        if "zhijxu_START_PROFILING" in os.environ:
+            torch.cuda.nvtx.range_pop()
+            torch.cuda.nvtx.range_pop()
 
         return loss.detach()
 
