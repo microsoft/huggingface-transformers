@@ -1469,7 +1469,7 @@ class RobertaForQuestionAnswering(RobertaPreTrainedModel):
             if len(end_positions.size()) > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = start_logits.size(1)
+            ignored_index = 344 # start_logits.size(1)
             start_positions.clamp_(0, ignored_index)
             end_positions.clamp_(0, ignored_index)
 
