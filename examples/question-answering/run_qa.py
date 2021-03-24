@@ -242,7 +242,6 @@ def main():
         revision=model_args.model_revision,
         use_auth_token=True if model_args.use_auth_token else None,
     )
-    config.num_hidden_layers = 2
     tokenizer = AutoTokenizer.from_pretrained(
         model_args.tokenizer_name if model_args.tokenizer_name else model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
@@ -480,9 +479,6 @@ def main():
         else:
             checkpoint = None
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
-
-        import torch
-        torch.cuda.cudart().cudaProfilerStop()
         trainer.save_model()  # Saves the tokenizer too for easy upload
 
         metrics = train_result.metrics
