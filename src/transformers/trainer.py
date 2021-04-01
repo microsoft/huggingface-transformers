@@ -894,6 +894,92 @@ class Trainer:
             num_update_steps_per_epoch = max_steps
 
         delay_optimizer_creation = self.sharded_ddp is not None and self.sharded_ddp != ShardedDDPOption.SIMPLE
+        if self.args.orttrainer:
+            from onnxruntime.training import ORTTrainer, ORTTrainerOptions, optim, amp
+            def orttrainer_stuff(torch_model):
+
+                #1 io description
+                def bert_model_description():
+                    import os
+                    if os.environ["USE_STATIC_SHAPE"] != "True":
+                      print("using dynamic shape in orttrainer")
+                      io_dict = {
+                        "inputs": [
+                        ("attention_mask", ['batch', 'max_seq_len_in_batch']),
+                        ("input_ids", ['batch', 'max_seq_len_in_batch']),
+                        ("end_positions", ['batch']),
+                        ("start_positions", ['batch']),
+                        ],
+                        "outputs": [
+                        ("loss", [], True)
+                        ]
+                      }
+                    elif os.environ["USE_STATIC_SHAPE"] == "True":
+                      print("using static shape in orttrainer")
+                      io_dict = {
+                        "inputs": [
+                        ("attention_mask", []),
+                        ("input_ids", []),
+                        ("end_positions", []),
+                        ("start_positions", []),
+                        ],
+                        "outputs": [
+                        ("loss", [], True)
+                        ]
+                      }
+                    return io_dict
+
+                #option
+                param_optimizer = list(torch_model.named_parameters())
+                no_decay = ['bias', 'gamma', 'beta', 'LayerNorm']
+                decay_mode = optim.AdamConfig.DecayMode.BEFORE_WEIGHT_UPDATE
+                optim_adam_config = optim.AdamConfig(
+                        lr=1e-5, alpha=0.9, beta=0.999, lambda_coef=0.01, epsilon=1e-6, do_bias_correction=False, weight_decay_mode=decay_mode,
+                        params=[{
+                            'params': [n for n, p in param_optimizer if any(nd in n for nd in no_decay)],
+                            'alpha': 0.9, 'beta': 0.999, 'lambda_coef': 0.00, 'epsilon': 1e-6, 'do_bias_correction': False, 'weight_decay_mode': decay_mode
+                        }]
+                )
+                optim_lamb_config = optim.LambConfig(
+                        lr=1e-5, alpha=0.9, beta=0.999, lambda_coef=0.01, epsilon=1e-6, do_bias_correction=False, ratio_max=1.0,
+                        params=[{
+                            'params': [n for n, p in param_optimizer if any(nd in n for nd in no_decay)],
+                            'alpha': 0.9, 'beta': 0.999, 'lambda_coef': 0.00, 'epsilon': 1e-6, 'do_bias_correction': False, "ratio_max": 1.0 # old version: "ratio_min": 0.08, "ratio_max": 0.5
+                        }]
+                )
+
+                optim_config = optim_adam_config
+
+                warmup_scheduler_dict = {"warmup_cosine": optim.CosineWarmupLRScheduler,
+                                        "warmup_constant": optim.ConstantWarmupLRScheduler,
+                                        "warmup_linear": optim.LinearWarmupLRScheduler,
+                                        "warmup_poly": optim.PolyWarmupLRScheduler}
+                opts = ORTTrainerOptions(
+                    {'device': {
+                        'id': f"cuda:{self.args.local_rank}"},
+                    'lr_scheduler': warmup_scheduler_dict["warmup_poly"](total_steps=self.args.max_steps, warmup=float(self.args.warmup_steps/self.args.max_steps)),
+                    'batch': {
+                        'gradient_accumulation_steps': 1},
+                    'mixed_precision': {
+                        'enabled': True if os.environ["USE_FP16"]=="True" else False},
+                    'distributed': {
+                        'world_rank': self.args.local_rank,
+                        'world_size': 1,
+                        'allreduce_post_accumulation': True,
+                        'deepspeed_zero_optimization': {'stage': 0}},
+                    'utils': {
+                        'frozen_weights': [],
+                        'grad_norm_clip': True},
+                    })
+
+                #3 generate orttrainer instance
+                model = ORTTrainer(torch_model,
+                                bert_model_description(),
+                                optim_config,
+                                options=opts)
+                return model
+            self.orttrainer = orttrainer_stuff(self.model)
+
         if self.args.ortmodule:
             from onnxruntime.training import ORTModule
             logger.info("Converting to ORTModule ....")
@@ -1430,6 +1516,10 @@ class Trainer:
         """
         model.train()
         inputs = self._prepare_inputs(inputs)
+        tmp = list(inputs.values())
+        if self.args.orttrainer:
+            tmp = self.orttrainer.train_step(**inputs)
+            return tmp
 
         if self.use_amp:
             with autocast():
