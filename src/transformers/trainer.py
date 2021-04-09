@@ -907,6 +907,8 @@ class Trainer:
             from onnxruntime.training import ORTModule
             logger.info("Converting to ORTModule ....")
             model = ORTModule(self.model)
+            model._save_onnx = True
+            model._save_onnx_prefix = 'hf-bert'
             self.model_wrapped = model
         if self.args.deepspeed:
             if self.args.ort:

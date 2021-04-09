@@ -1325,8 +1325,9 @@ class BertForMaskedLM(BertPreTrainedModel):
 
         masked_lm_loss = None
         if labels is not None:
+            prediction_scores = prediction_scores.to(dtype=float)
             loss_fct = CrossEntropyLoss()  # -100 index = padding token
-            masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size), labels.view(-1))
+            masked_lm_loss = loss_fct(prediction_scores.view(-1, self.config.vocab_size).to(torch.float32), labels.view(-1))
 
         if not return_dict:
             output = (prediction_scores,) + outputs[2:]
