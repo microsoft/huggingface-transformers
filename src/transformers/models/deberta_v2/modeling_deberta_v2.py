@@ -35,6 +35,7 @@ from ...modeling_utils import PreTrainedModel
 from ...utils import logging
 from .configuration_deberta_v2 import DebertaV2Config
 
+from .jit_tracing import traceable
 
 logger = logging.get_logger(__name__)
 
@@ -74,6 +75,7 @@ class ContextPooler(nn.Module):
 
 
 # Copied from transformers.models.deberta.modeling_deberta.XSoftmax with deberta->deberta_v2
+@traceable
 class XSoftmax(torch.autograd.Function):
     """
     Masked Softmax which is optimized for saving memory
@@ -145,6 +147,7 @@ def get_mask(input, local_context):
 
 
 # Copied from transformers.models.deberta.modeling_deberta.XDropout
+@traceable
 class XDropout(torch.autograd.Function):
     """Optimized dropout function to save computation and memory by using mask operation instead of multiplication."""
 
@@ -167,8 +170,13 @@ class XDropout(torch.autograd.Function):
             return grad_output, None
 
 
+# replacing stable dropout with nn.Dropout to work with ORTModule
+class StableDropout(torch.nn.Dropout):
+  def __init__(self, drop_prob):
+      super().__init__(drop_prob)
+
 # Copied from transformers.models.deberta.modeling_deberta.StableDropout
-class StableDropout(torch.nn.Module):
+class StableDropout1(torch.nn.Module):
     """
     Optimized dropout module for stabilizing the training
 
