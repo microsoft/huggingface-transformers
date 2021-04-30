@@ -904,11 +904,15 @@ class Trainer:
         delay_optimizer_creation = self.sharded_ddp is not None and self.sharded_ddp != ShardedDDPOption.SIMPLE
         model = self.model
         if self.args.ort:
-            from onnxruntime.training import ORTModule
+            from onnxruntime.training.ortmodule import ORTModule
+            from onnxruntime.training.ortmodule import _logger as _logger
             logger.info("Converting to ORTModule ....")
             model = ORTModule(self.model)
-            model._save_onnx = True
-            model._save_onnx_prefix = 'hf-bert'
+            model._execution_manager(is_training=True)._loglevel = _logger.LogLevel.VERBOSE
+            model._execution_manager(True)._save_onnx = True
+            model._execution_manager(True)._save_onnx_prefix = "hf-bert"
+            model._execution_manager(True)._propagate_cast_ops_level = 2
+            model._execution_manager(True)._propagate_cast_ops_allow = ["Gather"] # goes with 0
             self.model_wrapped = model
         if self.args.deepspeed:
             if self.args.ort:
