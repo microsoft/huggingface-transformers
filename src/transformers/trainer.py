@@ -911,8 +911,9 @@ class Trainer:
             #model._execution_manager(is_training=True)._loglevel = _logger.LogLevel.VERBOSE
             model._execution_manager(True)._save_onnx = True
             model._execution_manager(True)._save_onnx_prefix = "hf-bert"
+            # Optimizations
+            model._execution_manager(True)._run_symbolic_shape_infer = True
             model._execution_manager(True)._propagate_cast_ops_level = 2
-            #model._execution_manager(True)._propagate_cast_ops_allow = ["Gather"] # goes with 0
             self.model_wrapped = model
         if self.args.deepspeed:
             if self.args.ort:
