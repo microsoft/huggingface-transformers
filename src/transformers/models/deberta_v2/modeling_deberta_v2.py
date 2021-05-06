@@ -104,7 +104,7 @@ class XSoftmax(torch.autograd.Function):
         self.dim = dim
         rmask = ~(mask.bool())
 
-        output = input.masked_fill(rmask, float("-inf"))
+        output = input.masked_fill(rmask, float(-10000))#"-inf"))
         output = torch.softmax(output, self.dim)
         output.masked_fill_(rmask, 0)
         self.save_for_backward(output)
