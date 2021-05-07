@@ -1318,7 +1318,7 @@ class Trainer:
                 train_step_metrics = speed_metrics("train_step", 
                     start_train_step_time, self.args.per_device_train_batch_size)
                 self.log(train_step_metrics)
-                self.log(tr_loss)
+                #self.log(tr_loss)
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
