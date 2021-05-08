@@ -1084,13 +1084,12 @@ class Trainer:
             logger.info("Converting to ORTModule ....")
             model = ORTModule(self.model)
             from onnxruntime.training.ortmodule import _logger as _logger
-            model = ORTModule(self.model)
             model._execution_manager(is_training=True)._loglevel = _logger.LogLevel.VERBOSE
             model._execution_manager(True)._save_onnx = True
             model._execution_manager(True)._save_onnx_prefix = "hf-bert"
             # Optimizations
             model._execution_manager(True)._run_symbolic_shape_infer = True
-            model._execution_manager(True)._propagate_cast_ops_level = 2
+            model._execution_manager(True)._propagate_cast_ops_level = args.cast_propagation_level
             self.model_wrapped = model
         if args.deepspeed:
             if args.ort:
@@ -1318,7 +1317,6 @@ class Trainer:
                 train_step_metrics = speed_metrics("train_step", 
                     start_train_step_time, self.args.per_device_train_batch_size)
                 self.log(train_step_metrics)
-                #self.log(tr_loss)
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break

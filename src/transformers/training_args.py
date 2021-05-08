@@ -503,6 +503,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Enable Ort"},
     )
+    cast_propagation_level: Optional[int] = field(
+        default=0,
+        metadata={"help": "Enable Cast Propagation in ORT"},
+    )
     label_smoothing_factor: float = field(
         default=0.0, metadata={"help": "The label smoothing epsilon to apply (zero means no label smoothing)."}
     )

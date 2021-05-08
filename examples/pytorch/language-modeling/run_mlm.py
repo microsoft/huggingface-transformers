@@ -276,6 +276,7 @@ def main():
         "revision": model_args.model_revision,
         "use_auth_token": True if model_args.use_auth_token else None,
         "ort": True if training_args.ort else None,
+        "cast_propagation_level": training_args.cast_propagation_level,
     }
     if model_args.config_name:
         config = AutoConfig.from_pretrained(model_args.config_name, **config_kwargs)
