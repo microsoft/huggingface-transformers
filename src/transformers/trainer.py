@@ -1090,6 +1090,8 @@ class Trainer:
             # Optimizations
             model._execution_manager(True)._run_symbolic_shape_infer = True
             model._execution_manager(True)._propagate_cast_ops_level = args.cast_propagation_level
+            model._execution_manager(True)._propagate_cast_ops_strategy = (PropagateCastOpsStrategy.FLOOD_FILL |
+                                        PropagateCastOpsStrategy.REMOVE_INPUT_OUTPUT_UP_DOWN_CASTS)
             self.model_wrapped = model
         if args.deepspeed:
             if args.ort:
