@@ -206,6 +206,7 @@ class PretrainedConfig(PushToHubMixin):
         self.use_bfloat16 = kwargs.pop("use_bfloat16", False)
         self.ort = kwargs.pop("ort", False)
         self.cast_propagation_level = kwargs.pop("cast_propagation_level", 0)
+        self.cast_propagation_strategy = kwargs.pop("cast_propagation_strategy", 0)
         self.pruned_heads = kwargs.pop("pruned_heads", {})
         self.tie_word_embeddings = kwargs.pop(
             "tie_word_embeddings", True

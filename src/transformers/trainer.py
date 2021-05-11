@@ -1090,8 +1090,13 @@ class Trainer:
             # Optimizations
             model._execution_manager(True)._run_symbolic_shape_infer = True
             model._execution_manager(True)._propagate_cast_ops_level = args.cast_propagation_level
-            model._execution_manager(True)._propagate_cast_ops_strategy = (PropagateCastOpsStrategy.FLOOD_FILL |
+            if args.cast_propagation_strategy > 0:
+                from onnxruntime.training import PropagateCastOpsStrategy
+                if args.cast_propagation_strategy == 1:
+                    model._execution_manager(True)._propagate_cast_ops_strategy = (PropagateCastOpsStrategy.FLOOD_FILL |
                                         PropagateCastOpsStrategy.REMOVE_INPUT_OUTPUT_UP_DOWN_CASTS)
+                elif args.cast_propagation_strategy == 1:
+                    model._execution_manager(True)._propagate_cast_ops_strategy = PropagateCastOpsStrategy.INSERT_AND_REDUCE
             self.model_wrapped = model
         if args.deepspeed:
             if args.ort:

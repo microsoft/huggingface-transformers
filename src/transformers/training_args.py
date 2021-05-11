@@ -505,7 +505,11 @@ class TrainingArguments:
     )
     cast_propagation_level: Optional[int] = field(
         default=0,
-        metadata={"help": "Enable Cast Propagation in ORT"},
+        metadata={"help": "Set Cast Propagation Level in ORT"},
+    )
+    cast_propagation_strategy: Optional[int] = field(
+        default=0,
+        metadata={"help": "Enable Cast Propagation Strategy in ORT. 0 - no strategy. 1 - FLOOD_FILL | UP_DOWN_CAST 2 - INSERT_AND_REDUCE"},
     )
     label_smoothing_factor: float = field(
         default=0.0, metadata={"help": "The label smoothing epsilon to apply (zero means no label smoothing)."}
