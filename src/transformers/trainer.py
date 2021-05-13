@@ -1083,8 +1083,8 @@ class Trainer:
             from onnxruntime.training.ortmodule import ORTModule
             logger.info("Converting to ORTModule ....")
             model = ORTModule(self.model)
-            from onnxruntime.training.ortmodule import _logger as _logger
-            model._execution_manager(is_training=True)._loglevel = _logger.LogLevel.VERBOSE
+            #from onnxruntime.training.ortmodule import _logger as _logger
+            #model._execution_manager(is_training=True)._loglevel = _logger.LogLevel.VERBOSE
             model._execution_manager(True)._save_onnx = True
             model._execution_manager(True)._save_onnx_prefix = "hf-bert"
             # Optimizations
