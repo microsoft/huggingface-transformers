@@ -42,8 +42,8 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint, is_main_process
 from transformers.utils import check_min_version
-
-
+#import pdb; pdb.set_trace()
+import cProfile,io,pstats
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
 check_min_version("4.6.0.dev0")
 
@@ -119,6 +119,9 @@ class DataTrainingArguments:
     )
     validation_file: Optional[str] = field(
         default=None, metadata={"help": "A csv or a json file containing the validation data."}
+    )
+    do_cprofile: bool = field(
+        default=False, metadata={"help": "run cProfile on train"}
     )
     test_file: Optional[str] = field(default=None, metadata={"help": "A csv or a json file containing the test data."})
 
@@ -455,8 +458,22 @@ def main():
             # checkpoint.
             if AutoConfig.from_pretrained(model_args.model_name_or_path).num_labels == num_labels:
                 checkpoint = model_args.model_name_or_path
-
+        
+        if data_args.do_cprofile:
+            pr = cProfile.Profile()
+            pr.enable()
+        
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        if data_args.do_cprofile:
+            pr.disable()
+            pr.print_stats()
+            s = io.StringIO()
+            sortby = 'cumulative'
+            ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+            print("Cumulative stats")
+            ps.print_stats()
+            print(s.getvalue())
+
         metrics = train_result.metrics
         max_train_samples = (
             data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
