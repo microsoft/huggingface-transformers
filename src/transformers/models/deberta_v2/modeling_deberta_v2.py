@@ -175,7 +175,6 @@ class XDropout(torch.autograd.Function):
 
 class TorchNNDropout(torch.nn.Dropout):
   def __init__(self, drop_prob):
-      print("using torch.nn.Dropout")
       super().__init__(drop_prob)
 
 # Copied from transformers.models.deberta.modeling_deberta.StableDropout
@@ -188,7 +187,6 @@ class StableDropout(torch.nn.Module):
     """
 
     def __init__(self, drop_prob):
-        print("using StableDropout")
         super().__init__()
         self.drop_prob = drop_prob
         self.count = 0
