@@ -19,11 +19,21 @@ from collections.abc import Sequence
 
 import numpy as np
 import torch
-from torch import _softmax_backward_data, nn
-from torch.nn import CrossEntropyLoss, LayerNorm
+from torch import (
+    _softmax_backward_data,
+    nn,
+)
+from torch.nn import (
+    CrossEntropyLoss,
+    LayerNorm,
+)
 
 from ...activations import ACT2FN
-from ...file_utils import add_code_sample_docstrings, add_start_docstrings, add_start_docstrings_to_model_forward
+from ...file_utils import (
+    add_code_sample_docstrings,
+    add_start_docstrings,
+    add_start_docstrings_to_model_forward,
+)
 from ...modeling_outputs import (
     BaseModelOutput,
     MaskedLMOutput,
@@ -34,8 +44,8 @@ from ...modeling_outputs import (
 from ...modeling_utils import PreTrainedModel
 from ...utils import logging
 from .configuration_deberta_v2 import DebertaV2Config
-
 from .jit_tracing import traceable
+
 
 logger = logging.get_logger(__name__)
 
@@ -77,8 +87,8 @@ class ContextPooler(nn.Module):
         return self.config.hidden_size
 
 
-# Copied from transformers.models.deberta.modeling_deberta.XSoftmax with deberta->deberta_v2
 @traceable
+# Copied from transformers.models.deberta.modeling_deberta.XSoftmax with deberta->deberta_v2
 class XSoftmax(torch.autograd.Function):
     """
     Masked Softmax which is optimized for saving memory
@@ -149,8 +159,8 @@ def get_mask(input, local_context):
     return mask, dropout
 
 
-# Copied from transformers.models.deberta.modeling_deberta.XDropout
 @traceable
+# Copied from transformers.models.deberta.modeling_deberta.XDropout
 class XDropout(torch.autograd.Function):
     """Optimized dropout function to save computation and memory by using mask operation instead of multiplication."""
 
@@ -174,8 +184,9 @@ class XDropout(torch.autograd.Function):
 
 
 class TorchNNDropout(torch.nn.Dropout):
-  def __init__(self, drop_prob):
-      super().__init__(drop_prob)
+    def __init__(self, drop_prob):
+        super().__init__(drop_prob)
+
 
 # Copied from transformers.models.deberta.modeling_deberta.StableDropout
 class StableDropout(torch.nn.Module):
@@ -237,7 +248,6 @@ class DebertaV2SelfOutput(nn.Module):
             self.dropout = TorchNNDropout(config.hidden_dropout_prob)
         else:
             self.dropout = StableDropout(config.hidden_dropout_prob)
-        
 
     def forward(self, hidden_states, input_tensor):
         hidden_states = self.dense(hidden_states)
