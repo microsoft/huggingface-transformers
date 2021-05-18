@@ -1474,8 +1474,8 @@ class RobertaForQuestionAnswering(RobertaPreTrainedModel):
             end_positions.clamp_(0, ignored_index)
 
             loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
-            start_loss = loss_fct(start_logits, start_positions)
-            end_loss = loss_fct(end_logits, end_positions)
+            start_loss = loss_fct(start_logits.to(torch.float32), start_positions)
+            end_loss = loss_fct(end_logits.to(torch.float32), end_positions)
             total_loss = (start_loss + end_loss) / 2
 
         if not return_dict:
