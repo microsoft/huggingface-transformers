@@ -1,0 +1,13 @@
+{
+  "train_batch_size": 16,
+  "fp16": {
+    "enabled": true,
+    "initial_scale_power": 12
+  },
+  "zero_optimization": {
+    "stage": 1,
+    "reduce_bucket_size": 5e8,
+    "allgather_bucket_size": 5e8
+  },
+  "zero_allow_untested_optimizer": true
+}
