@@ -126,7 +126,10 @@ class XSoftmax(torch.autograd.Function):
     @staticmethod
     def backward(self, grad_output):
         (output,) = self.saved_tensors
-        print("Xsoftmax forward: saved tensor size : ", output.size())
+        if output is not None:
+            print("Xsoftmax backward: saved tensor size : ", output.size())
+        else:
+            print("Xsoftmax backward: saved tensor is none")
         inputGrad = _softmax_backward_data(grad_output, output, self.dim, output)
         return inputGrad, None, None
 
