@@ -116,7 +116,7 @@ class XSoftmax(torch.autograd.Function):
     def forward(self, input, mask, dim):
         self.dim = dim
         rmask = ~(mask.bool())
-
+        print("Xsoftmax forward: attention mask : ", mask.size())
         output = input.masked_fill(rmask, float("-inf"))
         output = torch.softmax(output, self.dim)
         output.masked_fill_(rmask, 0)
@@ -126,6 +126,7 @@ class XSoftmax(torch.autograd.Function):
     @staticmethod
     def backward(self, grad_output):
         (output,) = self.saved_tensors
+        print("Xsoftmax forward: saved tensor size : ", output.size())
         inputGrad = _softmax_backward_data(grad_output, output, self.dim, output)
         return inputGrad, None, None
 
