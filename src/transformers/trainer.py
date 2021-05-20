@@ -1742,6 +1742,9 @@ class Trainer:
         """
         model.train()
         inputs = self._prepare_inputs(inputs)
+        
+        logger.info("Memory allocated/reserved before forward: {:.0f}MB / {:.0f}MB".format(
+            torch.cuda.memory_allocated() / 1024 / 1024, torch.cuda.memory_reserved() / 1024 / 1024)) 
 
         if is_sagemaker_mp_enabled():
             scaler = self.scaler if self.use_amp else None
@@ -1757,9 +1760,15 @@ class Trainer:
         if self.args.n_gpu > 1:
             loss = loss.mean()  # mean() to average on multi-gpu parallel training
 
+        logger.info("Memory allocated/reserved after forward: {:.0f}MB / {:.0f}MB".format(
+            torch.cuda.memory_allocated() / 1024 / 1024, torch.cuda.memory_reserved() / 1024 / 1024))
+
         if self.args.gradient_accumulation_steps > 1 and not self.deepspeed:
             # deepspeed handles loss scaling by gradient_accumulation_steps in its `backward`
             loss = loss / self.args.gradient_accumulation_steps
+
+        logger.info("Memory allocated/reserved before backward: {:.0f}MB / {:.0f}MB".format(
+            torch.cuda.memory_allocated() / 1024 / 1024, torch.cuda.memory_reserved() / 1024 / 1024))
 
         if self.use_amp:
             self.scaler.scale(loss).backward()
@@ -1772,6 +1781,9 @@ class Trainer:
         else:
             loss.backward()
 
+        logger.info("Memory allocated/reserved after backward: {:.0f}MB / {:.0f}MB".format(
+            torch.cuda.memory_allocated() / 1024 / 1024, torch.cuda.memory_reserved() / 1024 / 1024))
+        
         return loss.detach()
 
     def compute_loss(self, model, inputs, return_outputs=False):
