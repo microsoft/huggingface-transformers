@@ -191,9 +191,12 @@ class TorchNNDropout(torch.nn.Dropout):
     def __init__(self, drop_prob):
         super().__init__(drop_prob)
 
+class StableDropout(torch.nn.Dropout):
+    def __init__(self, drop_prob):
+        super().__init__(drop_prob)
 
 # Copied from transformers.models.deberta.modeling_deberta.StableDropout
-class StableDropout(torch.nn.Module):
+class StableDropout1(torch.nn.Module):
     """
     Optimized dropout module for stabilizing the training
 
@@ -708,7 +711,19 @@ class DisentangledSelfAttention(torch.nn.Module):
         )
 
         # bsz x height x length x dimension
-        attention_probs = XSoftmax.apply(attention_scores, attention_mask, -1)
+        #attention_probs = XSoftmax.apply(attention_scores, attention_mask, -1)
+        rmask = ~(attention_mask.bool())
+        logger.info(f"Softmax forward: attention mask :  {attention_mask.size()} and size is {sys.getsizeof(attention_mask.storage())}")
+        attention_probs = attention_scores.masked_fill(rmask, float("-inf"))
+        attention_probs = torch.softmax(attention_probs, -1)
+        attention_probs = attention_probs.masked_fill(rmask, 0)
+
+        #softmax_input = torch.where(attention_mask, attention_scores, torch.tensor(-10000.0).half().cuda())
+        #attention_probs = torch.softmax(softmax_input, -1)
+        #logger.info(f' Sergii before: {attention_probs}')
+        #attention_probs.masked_fill(attention_mask, 0)
+        #logger.info(f' Sergii after : {attention_probs}')
+
         attention_probs = self.dropout(attention_probs)
         context_layer = torch.bmm(
             attention_probs.view(-1, attention_probs.size(-2), attention_probs.size(-1)), value_layer
