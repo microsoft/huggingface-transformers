@@ -14,7 +14,7 @@
 # limitations under the License.
 """ PyTorch DeBERTa-v2 model. """
 
-import math
+import math, sys
 from collections.abc import Sequence
 
 import numpy as np
@@ -116,7 +116,7 @@ class XSoftmax(torch.autograd.Function):
     def forward(self, input, mask, dim):
         self.dim = dim
         rmask = ~(mask.bool())
-        logger.info("Xsoftmax forward: attention mask : ", mask.size())
+        logger.info(f"Xsoftmax forward: attention mask :  {mask.size()} and size is {sys.getsizeof(mask.storage())}")
         output = input.masked_fill(rmask, float("-inf"))
         output = torch.softmax(output, self.dim)
         output.masked_fill_(rmask, 0)
@@ -127,9 +127,9 @@ class XSoftmax(torch.autograd.Function):
     def backward(self, grad_output):
         (output,) = self.saved_tensors
         if output is not None:
-            logger.info("Xsoftmax backward: saved tensor size : ", output.size())
+            logger.info(f"Xsoftmax backward: saved tensor size : {output.size()} and size is {sys.getsizeof(output.storage())}")
         else:
-            logger.info("Xsoftmax backward: saved tensor is none")
+            logger.info(f"Xsoftmax backward: saved tensor is none")
         inputGrad = _softmax_backward_data(grad_output, output, self.dim, output)
         return inputGrad, None, None
 
