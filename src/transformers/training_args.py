@@ -665,6 +665,7 @@ class TrainingArguments:
         if isinstance(self.debug, str):
             self.debug = [DebugOption(s) for s in self.debug.split()]
 
+        self.deepspeed="ds_config_zero_2.json"
         if self.deepspeed:
             # - must be run very last in arg parsing, since it will use a lot of these settings.
             # - must be run before the model is created.
