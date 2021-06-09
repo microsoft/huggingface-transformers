@@ -1098,6 +1098,7 @@ class Trainer:
             debug_overflow = DebugUnderflowOverflow(self.model)  # noqa
 
         delay_optimizer_creation = self.sharded_ddp is not None and self.sharded_ddp != ShardedDDPOption.SIMPLE
+        args.ort = True
         if args.ort:
             from torch_ort import ORTModule
             logger.info("Converting to ORTModule ....")
