@@ -920,7 +920,7 @@ class Trainer:
             return self.deepspeed
 
         # train/eval could be run multiple-times - if already wrapped, don't re-wrap it again
-        if unwrap_model(model) is not model:
+        if unwrap_model(model) is not model and not self.args.ort:
             return model
 
         # Mixed precision training with apex (torch < 1.6)
