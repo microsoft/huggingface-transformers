@@ -1103,11 +1103,10 @@ class Trainer:
             logger.info("Converting to ORTModule ....")
             from torch_ort.experimental import set_log_level, LogLevel
             from torch_ort.experimental import save_intermediate_onnx_graphs 
-            from torch_ort.experimental import set_propagate_cast_ops_optimization, PropagateCastOpsStrategy, PropagateCastLevel
+            from onnxruntime.capi import _pybind_state as C
             model = ORTModule(self.model)
-            set_propagate_cast_ops_optimization(model=model, 
-                    level=PropagateCastLevel.AGGRRESSIVE_MIXED_PRECISION, 
-                    strategy=PropagateCastOpsStrategy.INSERT_AND_REDUCE)
+            model._execution_manager(is_training=True)._propagate_cast_ops_strategy = C.PropagateCastOpsStrategy.INSERT_AND_REDUCE
+            model._execution_manager(is_training=True)._propagate_cast_ops_level = 2
             save_intermediate_onnx_graphs(model=model, enable=True, prefix=os.path.join(os.getcwd(), 'hfmodel'))
             set_log_level(model=model, level=LogLevel.WARNING)
             self.model_wrapped = model
