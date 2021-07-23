@@ -1101,7 +1101,15 @@ class Trainer:
         delay_optimizer_creation = self.sharded_ddp is not None and self.sharded_ddp != ShardedDDPOption.SIMPLE
         if args.ort:
             logger.info("Converting to ORTModule ....")
+            from torch_ort.experimental import set_log_level, LogLevel
+            from torch_ort.experimental import save_intermediate_onnx_graphs 
+            from torch_ort.experimental import set_propagate_cast_ops_optimization, PropagateCastOpsStrategy, PropagateCastLevel
             model = ORTModule(self.model)
+            set_propagate_cast_ops_optimization(model=model, 
+                    level=PropagateCastLevel.AGGRRESSIVE_MIXED_PRECISION, 
+                    strategy=PropagateCastOpsStrategy.INSERT_AND_REDUCE)
+            save_intermediate_onnx_graphs(model=model, enable=True)
+            set_log_level(model=model, level=LogLevel.WARNING)
             self.model_wrapped = model
         if args.deepspeed:
             if args.ort:
@@ -1135,8 +1143,7 @@ class Trainer:
         # important: at this point:
         # self.model         is the Transformers Model
         # self.model_wrapped is DDP(Transformers Model), Deepspeed(Transformers Model), etc.
-        print('model {}'.format(type(self.model)))
-        print('model_wrapped {}'.format(type(self.model_wrapped)))
+        print('model_wrapped {}'.format(self.model_wrapped))
 
         # Train!
         if is_torch_tpu_available():
