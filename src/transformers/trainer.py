@@ -1108,7 +1108,7 @@ class Trainer:
             set_propagate_cast_ops_optimization(model=model, 
                     level=PropagateCastLevel.AGGRRESSIVE_MIXED_PRECISION, 
                     strategy=PropagateCastOpsStrategy.INSERT_AND_REDUCE)
-            save_intermediate_onnx_graphs(model=model, enable=True)
+            save_intermediate_onnx_graphs(model=model, enable=True, prefix=os.path.join(os.getcwd(), args.model_name_or_path))
             set_log_level(model=model, level=LogLevel.WARNING)
             self.model_wrapped = model
         if args.deepspeed:
