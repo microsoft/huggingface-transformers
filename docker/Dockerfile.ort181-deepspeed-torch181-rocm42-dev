@@ -1,0 +1,49 @@
+FROM rocm/deepspeed:rocm4.2_ubuntu18.04_py3.6_pytorch_1.8.1
+ENV ROCM_HOME=/opt/rocm
+
+# AMD environment parameters
+ENV HSA_FORCE_FINE_GRAIN_PCIE=1
+ 
+# Install and update tools to minimize security vulnerabilities
+RUN apt-get update
+RUN apt-get install -y software-properties-common wget apt-utils patchelf git libprotobuf-dev protobuf-compiler cmake unattended-upgrades
+RUN unattended-upgrade
+RUN apt-get autoremove -y
+
+# ORT dependencies
+RUN CC=mpicc MPICC=mpicc pip install mpi4py --no-binary mpi4py
+RUN pip install onnx ninja
+
+# ORT (from wheel)
+# RUN pip install --pre onnxruntime-training -f https://onnxruntimepackages.z14.web.core.windows.net/onnxruntime_stable_torch181.rocm42.html
+
+# ORT (from source)
+WORKDIR /source
+RUN git clone https://github.com/microsoft/onnxruntime.git &&\
+    cd onnxruntime &&\
+    git checkout sukha/rel-1.8.1-rocm-patches &&\
+    python tools/ci_build/build.py \
+      --config RelWithDebInfo \
+      --use_rocm \
+        --rocm_version=4.2 \
+        --rocm_home=/opt/rocm \
+        --nccl_home=/opt/rocm \
+      --update \
+      --parallel \
+      --build \
+      --build_dir build \
+      --build_wheel \
+      --skip_tests \
+      --enable_training
+RUN pip install onnxruntime/build/RelWithDebInfo/dist/*.whl
+
+ # torch/ort
+RUN pip install --pre torch-ort -f 'https://onnxruntimepackages.blob.core.windows.net/$web/torch_ort_nightly.html'
+RUN python -m torch_ort.configure
+
+WORKDIR /workspace
+
+# Basic testing
+#   git clone https://github.com/pytorch/ort.git
+#   pip install wget pandas transformers sklearn
+#   python ./ort/tests/bert_for_sequence_classification.py
