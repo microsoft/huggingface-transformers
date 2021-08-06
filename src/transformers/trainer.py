@@ -977,6 +977,8 @@ class Trainer:
                 output_device=self.args.local_rank,
                 find_unused_parameters=find_unused_parameters,
             )
+            from torch.distributed.algorithms.ddp_comm_hooks.default_hooks import fp16_compress_hook
+            model.register_comm_hook(state=None, hook=fp16_compress_hook)
 
         return model
 
