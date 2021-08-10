@@ -1333,9 +1333,9 @@ class Trainer:
 
                     self._maybe_log_save_evaluate(tr_loss, model, trial, epoch)
 
-                train_step_metrics = speed_metrics("train_step", 
-                    start_train_step_time, self.args.per_device_train_batch_size)
-                self.log(train_step_metrics)
+                #train_step_metrics = speed_metrics("train_step", 
+                #    start_train_step_time, self.args.per_device_train_batch_size)
+                #self.log(train_step_metrics)
 
                 if self.control.should_epoch_stop or self.control.should_training_stop:
                     break
