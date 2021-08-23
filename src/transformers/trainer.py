@@ -1107,6 +1107,9 @@ class Trainer:
             from torch_ort import ORTModule
             logger.info("Converting to ORTModule ....")
             model = ORTModule(self.model)
+            if args.ort_config_file:
+                from torch_ort.experimental.json_config import load_from_json
+                load_from_json(model, path=args.ort_config_file)
             self.model_wrapped = model
         if args.deepspeed:
             if args.ort:
