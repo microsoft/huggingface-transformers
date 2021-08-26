@@ -27,6 +27,7 @@ import sys
 import tempfile
 import time
 import warnings
+import json
 from logging import StreamHandler
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
@@ -1110,6 +1111,10 @@ class Trainer:
             if args.ort_config_file:
                 from torch_ort.experimental.json_config import load_from_json
                 load_from_json(model, path=args.ort_config_file)
+                with open(args.ort_config_file, 'r') as f:
+                    c = json.load(f)
+                logger.info("ORT internal config passed: ")
+                logger.info(c)
             self.model_wrapped = model
         if args.deepspeed:
             if args.ort:
