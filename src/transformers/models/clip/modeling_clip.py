@@ -18,7 +18,6 @@
 from typing import Any, Optional, Tuple
 
 import torch
-import torch.nn.functional as F
 import torch.utils.checkpoint
 from torch import nn
 
@@ -37,6 +36,7 @@ from .configuration_clip import CLIPConfig, CLIPTextConfig, CLIPVisionConfig
 
 logger = logging.get_logger(__name__)
 
+_CHECKPOINT_FOR_DOC = "openai/clip-vit-base-patch32"
 
 CLIP_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "openai/clip-vit-base-patch32",
@@ -61,14 +61,13 @@ def _expand_mask(mask: torch.Tensor, dtype: torch.dtype, tgt_len: Optional[int] 
 
 # contrastive loss function, adapted from
 # https://sachinruk.github.io/blog/pytorch/pytorch%20lightning/loss%20function/gpu/2021/03/07/CLIP.html
-def contrastive_loss(logits: torch.Tensor, dim: int) -> torch.Tensor:
-    neg_ce = torch.diag(F.log_softmax(logits, dim=dim))
-    return -neg_ce.mean()
+def contrastive_loss(logits: torch.Tensor) -> torch.Tensor:
+    return nn.functional.cross_entropy(logits, torch.arange(len(logits), device=logits.device))
 
 
 def clip_loss(similarity: torch.Tensor) -> torch.Tensor:
-    caption_loss = contrastive_loss(similarity, dim=0)
-    image_loss = contrastive_loss(similarity, dim=1)
+    caption_loss = contrastive_loss(similarity)
+    image_loss = contrastive_loss(similarity.T)
     return (caption_loss + image_loss) / 2.0
 
 
@@ -230,12 +229,12 @@ class CLIPAttention(nn.Module):
         if attention_mask is not None:
             if attention_mask.size() != (bsz, 1, tgt_len, src_len):
                 raise ValueError(
-                    f"Attention mask should be of size {(bsz, 1, tgt_len, src_len)}, but is {causal_attention_mask.size()}"
+                    f"Attention mask should be of size {(bsz, 1, tgt_len, src_len)}, but is {attention_mask.size()}"
                 )
             attn_weights = attn_weights.view(bsz, self.num_heads, tgt_len, src_len) + attention_mask
             attn_weights = attn_weights.view(bsz * self.num_heads, tgt_len, src_len)
 
-        attn_weights = F.softmax(attn_weights, dim=-1)
+        attn_weights = nn.functional.softmax(attn_weights, dim=-1)
 
         if output_attentions:
             # this operation is a bit akward, but it's required to
@@ -247,7 +246,7 @@ class CLIPAttention(nn.Module):
         else:
             attn_weights_reshaped = None
 
-        attn_probs = F.dropout(attn_weights, p=self.dropout, training=self.training)
+        attn_probs = nn.functional.dropout(attn_weights, p=self.dropout, training=self.training)
 
         attn_output = torch.bmm(attn_probs, value_states)
 
@@ -339,6 +338,7 @@ class CLIPPreTrainedModel(PreTrainedModel):
 
     config_class = CLIPConfig
     base_model_prefix = "clip"
+    supports_gradient_checkpointing = True
     _keys_to_ignore_on_load_missing = [r"position_ids"]
 
     def _init_weights(self, module):
@@ -383,6 +383,10 @@ class CLIPPreTrainedModel(PreTrainedModel):
             module.weight.data.fill_(1.0)
         if isinstance(module, nn.Linear) and module.bias is not None:
             module.bias.data.zero_()
+
+    def _set_gradient_checkpointing(self, module, value=False):
+        if isinstance(module, CLIPEncoder):
+            module.gradient_checkpointing = value
 
 
 CLIP_START_DOCSTRING = r"""
@@ -493,13 +497,14 @@ class CLIPEncoder(nn.Module):
 
     Args:
         config: CLIPConfig
-        embed_tokens (torch.nn.Embedding): output embedding
+        embed_tokens (nn.Embedding): output embedding
     """
 
     def __init__(self, config: CLIPConfig):
         super().__init__()
         self.config = config
         self.layers = nn.ModuleList([CLIPEncoderLayer(config) for _ in range(config.num_hidden_layers)])
+        self.gradient_checkpointing = False
 
     def forward(
         self,
@@ -552,7 +557,7 @@ class CLIPEncoder(nn.Module):
         for idx, encoder_layer in enumerate(self.layers):
             if output_hidden_states:
                 encoder_states = encoder_states + (hidden_states,)
-            if getattr(self.config, "gradient_checkpointing", False) and self.training:
+            if self.gradient_checkpointing and self.training:
 
                 def create_custom_forward(module):
                     def custom_forward(*inputs):
@@ -700,6 +705,18 @@ class CLIPTextModel(CLIPPreTrainedModel):
         r"""
         Returns:
 
+        Examples::
+
+            >>> from transformers import CLIPTokenizer, CLIPTextModel
+
+            >>> model = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32")
+            >>> tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+
+            >>> inputs = tokenizer(["a photo of a cat", "a photo of a dog"],  padding=True, return_tensors="pt")
+
+            >>> outputs = model(**inputs)
+            >>> last_hidden_state = outputs.last_hidden_state
+            >>> pooled_output = outputs.pooled_output # pooled (EOS token) states
         """
         return self.text_model(
             input_ids=input_ids,
@@ -792,6 +809,23 @@ class CLIPVisionModel(CLIPPreTrainedModel):
         r"""
         Returns:
 
+        Examples::
+
+            >>> from PIL import Image
+            >>> import requests
+            >>> from transformers import CLIPProcessor, CLIPVisionModel
+
+            >>> model = CLIPVisionModel.from_pretrained("openai/clip-vit-base-patch32")
+            >>> processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+            >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+            >>> image = Image.open(requests.get(url, stream=True).raw)
+
+            >>> inputs = processor(images=image, return_tensors="pt")
+
+            >>> outputs = model(**inputs)
+            >>> last_hidden_state = outputs.last_hidden_state
+            >>> pooled_output = outputs.pooled_output # pooled CLS states
         """
         return self.vision_model(
             pixel_values=pixel_values,
@@ -830,7 +864,7 @@ class CLIPModel(CLIPPreTrainedModel):
 
         self.visual_projection = nn.Linear(self.vision_embed_dim, self.projection_dim, bias=False)
         self.text_projection = nn.Linear(self.text_embed_dim, self.projection_dim, bias=False)
-        self.logit_scale = nn.Parameter(torch.ones([]))
+        self.logit_scale = nn.Parameter(torch.ones([]) * self.config.logit_scale_init_value)
 
         self.init_weights()
 
@@ -848,6 +882,16 @@ class CLIPModel(CLIPPreTrainedModel):
         Returns:
             text_features (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, output_dim`): The text embeddings
             obtained by applying the projection layer to the pooled output of :class:`~transformers.CLIPTextModel`.
+
+        Examples::
+
+            >>> from transformers import CLIPTokenizer, CLIPModel
+
+            >>> model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+            >>> tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+
+            >>> inputs = tokenizer(["a photo of a cat", "a photo of a dog"],  padding=True, return_tensors="pt")
+            >>> text_features = model.get_text_features(**inputs)
         """
         text_outputs = self.text_model(
             input_ids=input_ids,
@@ -875,6 +919,22 @@ class CLIPModel(CLIPPreTrainedModel):
         Returns:
             image_features (:obj:`torch.FloatTensor` of shape :obj:`(batch_size, output_dim`): The image embeddings
             obtained by applying the projection layer to the pooled output of :class:`~transformers.CLIPVisionModel`.
+
+        Examples::
+
+            >>> from PIL import Image
+            >>> import requests
+            >>> from transformers import CLIPProcessor, CLIPModel
+
+            >>> model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+            >>> processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+            >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+            >>> image = Image.open(requests.get(url, stream=True).raw)
+
+            >>> inputs = processor(images=image, return_tensors="pt")
+
+            >>> image_features = model.get_image_features(**inputs)
         """
         vision_outputs = self.vision_model(
             pixel_values=pixel_values,
@@ -903,6 +963,24 @@ class CLIPModel(CLIPPreTrainedModel):
     ):
         r"""
         Returns:
+
+        Examples::
+
+            >>> from PIL import Image
+            >>> import requests
+            >>> from transformers import CLIPProcessor, CLIPModel
+
+            >>> model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+            >>> processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+            >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+            >>> image = Image.open(requests.get(url, stream=True).raw)
+
+            >>> inputs = processor(text=["a photo of a cat", "a photo of a dog"], images=image, return_tensors="pt", padding=True)
+
+            >>> outputs = model(**inputs)
+            >>> logits_per_image = outputs.logits_per_image # this is the image-text similarity score
+            >>> probs = logits_per_image.softmax(dim=1) # we can take the softmax to get the label probabilities
 
         """
         return_dict = return_dict if return_dict is not None else self.config.return_dict

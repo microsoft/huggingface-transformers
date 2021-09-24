@@ -45,6 +45,7 @@ logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "LayoutLMConfig"
 _TOKENIZER_FOR_DOC = "LayoutLMTokenizer"
+_CHECKPOINT_FOR_DOC = "microsoft/layoutlm-base-uncased"
 
 LAYOUTLM_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "layoutlm-base-uncased",
@@ -52,7 +53,7 @@ LAYOUTLM_PRETRAINED_MODEL_ARCHIVE_LIST = [
 ]
 
 
-LayoutLMLayerNorm = torch.nn.LayerNorm
+LayoutLMLayerNorm = nn.LayerNorm
 
 
 class LayoutLMEmbeddings(nn.Module):
@@ -441,6 +442,7 @@ class LayoutLMEncoder(nn.Module):
         super().__init__()
         self.config = config
         self.layer = nn.ModuleList([LayoutLMLayer(config) for _ in range(config.num_hidden_layers)])
+        self.gradient_checkpointing = False
 
     def forward(
         self,
@@ -467,12 +469,11 @@ class LayoutLMEncoder(nn.Module):
             layer_head_mask = head_mask[i] if head_mask is not None else None
             past_key_value = past_key_values[i] if past_key_values is not None else None
 
-            if getattr(self.config, "gradient_checkpointing", False) and self.training:
+            if self.gradient_checkpointing and self.training:
 
                 if use_cache:
                     logger.warning(
-                        "`use_cache=True` is incompatible with `config.gradient_checkpointing=True`. Setting "
-                        "`use_cache=False`..."
+                        "`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`..."
                     )
                     use_cache = False
 
@@ -608,6 +609,7 @@ class LayoutLMPreTrainedModel(PreTrainedModel):
     config_class = LayoutLMConfig
     pretrained_model_archive_map = LAYOUTLM_PRETRAINED_MODEL_ARCHIVE_LIST
     base_model_prefix = "layoutlm"
+    supports_gradient_checkpointing = True
     _keys_to_ignore_on_load_missing = [r"position_ids"]
 
     def _init_weights(self, module):
@@ -625,6 +627,10 @@ class LayoutLMPreTrainedModel(PreTrainedModel):
         elif isinstance(module, LayoutLMLayerNorm):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
+
+    def _set_gradient_checkpointing(self, module, value=False):
+        if isinstance(module, LayoutLMEncoder):
+            module.gradient_checkpointing = value
 
 
 LAYOUTLM_START_DOCSTRING = r"""
@@ -1172,8 +1178,10 @@ class LayoutLMForTokenClassification(LayoutLMPreTrainedModel):
 
             if attention_mask is not None:
                 active_loss = attention_mask.view(-1) == 1
-                active_logits = logits.view(-1, self.num_labels)[active_loss]
-                active_labels = labels.view(-1)[active_loss]
+                active_logits = logits.view(-1, self.num_labels)
+                active_labels = torch.where(
+                    active_loss, labels.view(-1), torch.tensor(loss_fct.ignore_index).type_as(labels)
+                )
                 loss = loss_fct(active_logits, active_labels)
             else:
                 loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))

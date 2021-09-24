@@ -30,13 +30,14 @@ from ...file_utils import (
 from ...modeling_outputs import BaseModelOutputWithPooling
 from ...modeling_utils import PreTrainedModel
 from ...utils import logging
-from ..bert.modeling_bert import BertModel
+from ..bert.modeling_bert import BertEncoder, BertModel
 from .configuration_dpr import DPRConfig
 
 
 logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "DPRConfig"
+_CHECKPOINT_FOR_DOC = "facebook/dpr-ctx_encoder-single-nq-base"
 
 DPR_CONTEXT_ENCODER_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "facebook/dpr-ctx_encoder-single-nq-base",
@@ -241,8 +242,8 @@ class DPRSpanPredictor(PreTrainedModel):
         # compute logits
         logits = self.qa_outputs(sequence_output)
         start_logits, end_logits = logits.split(1, dim=-1)
-        start_logits = start_logits.squeeze(-1)
-        end_logits = end_logits.squeeze(-1)
+        start_logits = start_logits.squeeze(-1).contiguous()
+        end_logits = end_logits.squeeze(-1).contiguous()
         relevance_logits = self.qa_classifier(sequence_output[:, 0, :])
 
         # resize
@@ -299,6 +300,10 @@ class DPRPretrainedQuestionEncoder(PreTrainedModel):
     def init_weights(self):
         self.question_encoder.init_weights()
 
+    def _set_gradient_checkpointing(self, module, value=False):
+        if isinstance(module, BertEncoder):
+            module.gradient_checkpointing = value
+
 
 class DPRPretrainedReader(PreTrainedModel):
     """
@@ -315,6 +320,10 @@ class DPRPretrainedReader(PreTrainedModel):
         self.span_predictor.encoder.init_weights()
         self.span_predictor.qa_classifier.apply(self.span_predictor.encoder.bert_model._init_weights)
         self.span_predictor.qa_outputs.apply(self.span_predictor.encoder.bert_model._init_weights)
+
+    def _set_gradient_checkpointing(self, module, value=False):
+        if isinstance(module, BertEncoder):
+            module.gradient_checkpointing = value
 
 
 ###############
@@ -626,7 +635,7 @@ class DPRReader(DPRPretrainedReader):
             ...         return_tensors='pt'
             ...     )
             >>> outputs = model(**encoded_inputs)
-            >>> start_logits = outputs.stat_logits
+            >>> start_logits = outputs.start_logits
             >>> end_logits = outputs.end_logits
             >>> relevance_logits = outputs.relevance_logits
 
