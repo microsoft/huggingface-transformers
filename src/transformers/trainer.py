@@ -371,6 +371,7 @@ class Trainer:
         # later use `self.model is self.model_wrapped` to check if it's wrapped or not
         self.model_wrapped = model
         self.model = model
+        self.args.model = model
 
         self.compute_metrics = compute_metrics
         self.optimizer, self.lr_scheduler = optimizers
