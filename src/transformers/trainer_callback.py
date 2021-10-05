@@ -511,6 +511,9 @@ class CiPipelineCallback(TrainerCallback):
             jsonString = json.dumps(self.json, indent=4)
             with open("ci-pipeline-actual.json", "w") as jsonFile:
                 jsonFile.write(jsonString)
+            print('__superbench__ begin {}'.format(self.model.name_or_path))
+            print(jsonString)
+            print('__superbench__ end {}'.format(args.model.name_or_path))
 
 class PrinterCallback(TrainerCallback):
     """
