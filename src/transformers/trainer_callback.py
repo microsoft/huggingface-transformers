@@ -511,9 +511,9 @@ class CiPipelineCallback(TrainerCallback):
             jsonString = json.dumps(self.json, indent=4)
             with open("ci-pipeline-actual.json", "w") as jsonFile:
                 jsonFile.write(jsonString)
-            print('__superbench__ begin {} ngpu={}'.format(args.model.name_or_path, args.n_gpu))
+            print('__superbench__ begin {} ngpu={}'.format(args.model.name_or_path, args.world_size))
             print(jsonString)
-            print('__superbench__ end {} ngpu={}'.format(args.model.name_or_path, args.n_gpu))
+            print('__superbench__ end {} ngpu={}'.format(args.model.name_or_path, args.world_size))
 
 class PrinterCallback(TrainerCallback):
     """
