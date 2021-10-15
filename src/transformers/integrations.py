@@ -20,6 +20,7 @@ import json
 import numbers
 import os
 import tempfile
+import time
 import weakref
 from copy import deepcopy
 from pathlib import Path
@@ -245,7 +246,10 @@ def run_hp_search_ray(trainer, n_trials: int, direction: str, **kwargs) -> BestR
 def get_available_reporting_integrations():
     integrations = []
     if is_azureml_available():
-        integrations.append("azure_ml")
+        if is_mlflow_available():
+            integrations.append("mlflow")
+        else:
+            integrations.append("azure_ml")
     if is_comet_available():
         integrations.append("comet_ml")
     if is_mlflow_available():
@@ -828,7 +832,7 @@ class AzureMLCallback(TrainerCallback):
             self.azureml_run = Run.get_context()
 
     def on_log(self, args, state, control, logs=None, **kwargs):
-        if self.azureml_run and state.is_world_process_zero:
+        if self.azureml_run:
             for k, v in logs.items():
                 if isinstance(v, (int, float)):
                     self.azureml_run.log(k, v, description=k)
@@ -896,9 +900,10 @@ class MLflowCallback(TrainerCallback):
         if not self._initialized:
             self.setup(args, state, model)
         if state.is_world_process_zero:
+            metrics = []
             for k, v in logs.items():
                 if isinstance(v, (int, float)):
-                    self._ml_flow.log_metric(k, v, step=state.global_step)
+                    metrics.append(self._ml_flow.entities.Metric(k, v, int(time.time() * 1000), state.global_step))
                 else:
                     logger.warning(
                         f"Trainer is attempting to log a value of "
@@ -906,6 +911,7 @@ class MLflowCallback(TrainerCallback):
                         f"MLflow's log_metric() only accepts float and "
                         f"int types so we dropped this attribute."
                     )
+            self._ml_flow.log_batch(metrics=metrics)
 
     def on_train_end(self, args, state, control, **kwargs):
         if self._initialized and state.is_world_process_zero:
