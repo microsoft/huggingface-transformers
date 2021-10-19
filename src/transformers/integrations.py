@@ -246,10 +246,7 @@ def run_hp_search_ray(trainer, n_trials: int, direction: str, **kwargs) -> BestR
 def get_available_reporting_integrations():
     integrations = []
     if is_azureml_available():
-        if is_mlflow_available():
-            integrations.append("mlflow")
-        else:
-            integrations.append("azure_ml")
+        integrations.append("azure_ml")
     if is_comet_available():
         integrations.append("comet_ml")
     if is_mlflow_available():
@@ -289,10 +286,8 @@ def _set_if_auto(config, key, val):
 class DeepSpeedConfigHF:
     """
     This object contains Deepspeed configuration and can be quickly queried for things like zero stage.
-
     We store a ``weakref`` of this object in the module's global to be able to access the config from areas where the
     Trainer is not available (e.g. `from_pretrained` and `_get_resized_embeddings`).
-
     The ``DeepSpeedConfigHF`` object is meant to be created during ``TrainingArguments`` object creation and has the
     same lifespan as the latter.
     """
@@ -322,11 +317,9 @@ class DeepSpeedConfigHF:
         """
         1. load json if the ``args.deepspeed`` is a path
         2. replace any ``auto`` values in the config with the correct or recommended value
-
         This is done as early as possible, before model is created, to allow ``is_deepspeed_zero3_enabled`` query and
         getting to the early deepspeed config object during ``zero.Init()`` which needs whether fp16 is enabled, dtype,
         etc.
-
         """
         config_file_or_dict = args.deepspeed
         if isinstance(config_file_or_dict, dict):
@@ -399,9 +392,7 @@ class DeepSpeedConfigHF:
     def config_finalize(self, args, model, num_training_steps):
         """
         This stage is run after we have the model and know num_training_steps.
-
         Now we we can complete the configuration process.
-
         """
         config = self.config
 
@@ -449,16 +440,12 @@ def deepspeed_config():
 def deepspeed_init(trainer, num_training_steps, resume_from_checkpoint=None):
     """
     Init DeepSpeed, after updating the DeepSpeed configuration with any relevant Trainer's args.
-
     If ``resume_from_checkpoint`` was passed then an attempt to resume from a previously saved checkpoint will be made.
-
     Args:
         trainer: Trainer object
         num_training_steps: per single gpu
         resume_from_checkpoint: path to a checkpoint if to resume from after normal DeepSpeedEngine load
-
     Returns: model, optimizer, lr_scheduler
-
     """
     import deepspeed
 
@@ -554,7 +541,6 @@ class TensorBoardCallback(TrainerCallback):
     """
     A :class:`~transformers.TrainerCallback` that sends the logs to `TensorBoard
     <https://www.tensorflow.org/tensorboard>`__.
-
     Args:
         tb_writer (:obj:`SummaryWriter`, `optional`):
             The writer to use. Will instantiate one if not set.
@@ -655,10 +641,8 @@ class WandbCallback(TrainerCallback):
     def setup(self, args, state, model, **kwargs):
         """
         Setup the optional Weights & Biases (`wandb`) integration.
-
         One can subclass and override this method to customize the setup if needed. Find more information `here
         <https://docs.wandb.ai/integrations/huggingface>`__. You can also override the following environment variables:
-
         Environment:
             WANDB_LOG_MODEL (:obj:`bool`, `optional`, defaults to :obj:`False`):
                 Whether or not to log model as artifact at the end of training. Use along with
@@ -770,7 +754,6 @@ class CometCallback(TrainerCallback):
     def setup(self, args, state, model):
         """
         Setup the optional Comet.ml integration.
-
         Environment:
             COMET_MODE (:obj:`str`, `optional`):
                 "OFFLINE", "ONLINE", or "DISABLED"
@@ -778,7 +761,6 @@ class CometCallback(TrainerCallback):
                 Comet.ml project name for experiments
             COMET_OFFLINE_DIRECTORY (:obj:`str`, `optional`):
                 Folder to use for saving offline experiments when :obj:`COMET_MODE` is "OFFLINE"
-
         For a number of configurable items in the environment, see `here
         <https://www.comet.ml/docs/python-sdk/advanced/#comet-configuration-variables>`__.
         """
@@ -857,11 +839,9 @@ class MLflowCallback(TrainerCallback):
     def setup(self, args, state, model):
         """
         Setup the optional MLflow integration.
-
         Environment:
             HF_MLFLOW_LOG_ARTIFACTS (:obj:`str`, `optional`):
                 Whether to use MLflow .log_artifact() facility to log artifacts.
-
                 This only makes sense if logging to a remote server, e.g. s3 or GCS. If set to `True` or `1`, will copy
                 whatever is in :class:`~transformers.TrainingArguments`'s ``output_dir`` to the local or remote
                 artifact storage. Using it without a remote storage will just copy the files to your artifact location.
