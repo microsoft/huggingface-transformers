@@ -20,7 +20,6 @@ import json
 import numbers
 import os
 import tempfile
-import time
 import weakref
 from copy import deepcopy
 from pathlib import Path
@@ -880,10 +879,10 @@ class MLflowCallback(TrainerCallback):
         if not self._initialized:
             self.setup(args, state, model)
         if state.is_world_process_zero:
-            metrics = []
+            metrics = {}
             for k, v in logs.items():
                 if isinstance(v, (int, float)):
-                    metrics.append(self._ml_flow.entities.Metric(k, v, int(time.time() * 1000), state.global_step))
+                    metrics[k] = v
                 else:
                     logger.warning(
                         f"Trainer is attempting to log a value of "
@@ -891,7 +890,7 @@ class MLflowCallback(TrainerCallback):
                         f"MLflow's log_metric() only accepts float and "
                         f"int types so we dropped this attribute."
                     )
-            self._ml_flow.log_batch(metrics=metrics)
+            self._ml_flow.log_metrics(metrics=metrics, step=state.global_step)
 
     def on_train_end(self, args, state, control, **kwargs):
         if self._initialized and state.is_world_process_zero:
