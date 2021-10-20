@@ -20,7 +20,6 @@ import json
 import numbers
 import os
 import tempfile
-import time
 import weakref
 from copy import deepcopy
 from pathlib import Path
