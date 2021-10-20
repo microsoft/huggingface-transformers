@@ -908,7 +908,7 @@ class MLflowCallback(TrainerCallback):
                         f"MLflow's log_metric() only accepts float and "
                         f"int types so we dropped this attribute."
                     )
-            self._ml_flow.log_metrics(metrics=metrics, step=self.global_step)
+            self._ml_flow.log_metrics(metrics=metrics, step=state.global_step)
 
     def on_train_end(self, args, state, control, **kwargs):
         if self._initialized and state.is_world_process_zero:
