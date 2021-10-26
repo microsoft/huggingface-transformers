@@ -245,9 +245,7 @@ def run_hp_search_ray(trainer, n_trials: int, direction: str, **kwargs) -> BestR
 def get_available_reporting_integrations():
     integrations = []
     if is_azureml_available():
-        if is_mlflow_available():
-            integrations.append("mlflow")
-        else:
+        if not is_mlflow_available():
             integrations.append("azure_ml")
     if is_comet_available():
         integrations.append("comet_ml")
