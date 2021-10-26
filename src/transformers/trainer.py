@@ -791,6 +791,11 @@ class Trainer:
                 optimizer_kwargs = {"scale_parameter": False, "relative_step": False}
             else:
                 optimizer_cls = AdamW
+                if self.args.ort and self.args.ort_fused_adam:
+                    logger.info("Using ORTFusedAdam ...")
+                    from onnxruntime.training.optim.fused_adam import FusedAdam as ORTFusedAdam
+                    optimizer_cls = ORTFusedAdam
+
                 optimizer_kwargs = {
                     "betas": (self.args.adam_beta1, self.args.adam_beta2),
                     "eps": self.args.adam_epsilon,
@@ -931,6 +936,24 @@ class Trainer:
         # Mixed precision training with apex (torch < 1.6)
         if self.use_apex and training:
             model, self.optimizer = amp.initialize(model, self.optimizer, opt_level=self.args.fp16_opt_level)
+
+            if self.args.ort:
+                if self.args.ort_fp16_optimizer:
+                    logger.info("ORT_FP16_Optimizer enabled for apex path ...")
+                    from onnxruntime.training.optim.fp16_optimizer import FP16_Optimizer as ORT_FP16_Optimizer
+                    self.optimizer = ORT_FP16_Optimizer(self.optimizer)
+
+                # Workaround to make Apex O2 work with ORTModule.
+                def patch_new_fwd(old_new_fwd):
+                    def new_new_fwd(self, *args, **kwargs):
+                        return old_new_fwd(*args, **kwargs)
+                    return new_new_fwd
+                import types
+                from torch_ort import ORTModule
+                model.forward = types.MethodType(patch_new_fwd(model.forward), model)
+
+                logger.info("ORTModule wrap for Apex runs")
+                model = ORTModule(model)
 
         # Multi-gpu training (should be after apex fp16 initialization)
         if self.args.n_gpu > 1:
@@ -1103,7 +1126,8 @@ class Trainer:
             debug_overflow = DebugUnderflowOverflow(self.model)  # noqa
 
         delay_optimizer_creation = self.sharded_ddp is not None and self.sharded_ddp != ShardedDDPOption.SIMPLE
-        if args.ort:
+        if args.ort and not self.use_apex:
+            # Delay ORTModule wrap for use_apex=True cases.
             from torch_ort import ORTModule
             logger.info("Converting to ORTModule ....")
             model = ORTModule(self.model)

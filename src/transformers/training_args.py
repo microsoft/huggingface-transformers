@@ -524,7 +524,15 @@ class TrainingArguments:
     )
     ort: Optional[bool] = field(
         default=False,
-        metadata={"help": "Enable Ort"},
+        metadata={"help": "Enable Ort."},
+    )
+    ort_fused_adam: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Use Ort FusedAdam."},
+    )
+    ort_fp16_optimizer: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Enable Ort fp16 optimizer wrapper."},
     )
     label_smoothing_factor: float = field(
         default=0.0, metadata={"help": "The label smoothing epsilon to apply (zero means no label smoothing)."}
