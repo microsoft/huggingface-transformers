@@ -37,6 +37,7 @@ from .utils import (
     is_torch_cuda_available,
     is_torch_tpu_available,
     requires_backends,
+    logging
 )
 
 
@@ -648,6 +649,88 @@ def find_executable_batch_size(
 
     return functools.partial(function, batch_size=starting_batch_size)
 
+# Adapted from https://github.com/huggingface/accelerate/blob/a5525406fcba79523fc5edf1051360e15447ef6a/src/accelerate/utils/memory.py#L27
+def is_oom_error(exception: Exception) -> bool:
+    """
+    Checks if `exception` relates to CUDA out-of-memory, CUDNN not supported, or CPU out-of-memory
+    Args:
+        exception (`Exception`):
+            An exception
+    """
+    print("##### Exception", exception)
+    _statements = [
+        "CUDA out of memory.",  # CUDA OOM
+        "cuDNN error: CUDNN_STATUS_NOT_SUPPORTED.",  # CUDNN SNAFU
+        "DefaultCPUAllocator: can't allocate memory",  # CPU OOM
+    ]
+    if isinstance(exception, RuntimeError) and len(exception.args) == 1:
+        return any(err in exception.args[0] for err in _statements)
+    return False
+
+def find_max_batch_size(
+    function: callable = None, starting_batch_size: int = 128, auto_find_batch_size: bool = False
+):
+    """
+    starting_batch_size: per device batch size
+    """
+    # find_executable_batch_size imple
+    if function is None:
+        return functools.partial(
+            find_max_batch_size,
+            starting_batch_size=starting_batch_size,
+            auto_find_batch_size=auto_find_batch_size,
+        )
+
+    # accelerate.find_executable_batch_size imple
+    # if function is None:
+    #     return functools.partial(find_max_batch_size, starting_batch_size=starting_batch_size)
+
+    if not auto_find_batch_size:
+        return functools.partial(function, batch_size=starting_batch_size)
+    
+    logger = logging.get_logger(__name__)
+    logger.info("####### in main find_max_batch_size")
+    batch_size = starting_batch_size
+
+    def decorator(*args, **kwargs):
+        nonlocal batch_size
+        gc.collect()
+        torch.cuda.empty_cache()
+        params = list(inspect.signature(function).parameters.keys())
+        # Guard against user error
+        if len(params) < (len(args) + 1):
+            arg_str = ", ".join([f"{arg}={value}" for arg, value in zip(params[1:], args[1:])])
+            raise TypeError(
+                f"Batch size was passed into `{function.__name__}` as the first argument when called."
+                f"Remove this as the decorator already does so: `{function.__name__}({arg_str})`"
+            )
+        def find_max_batch_size_binary_search():
+            # Use binary search to find max batch size
+            l, r = 1, starting_batch_size
+            curr_max_batch_size = -1
+            while l <= r:
+                logger.info(f"##### l={l} r={r}")
+                # print(torch.cuda.memory_summary())
+                m = (l + r) // 2
+                try:
+                    logger.info(f"##### Attemping batch size {m}")
+                    function(m, *args, **kwargs) # overwrite step too, maybe not
+                    curr_max_batch_size = m
+                    l = m + 1
+                except Exception as e:
+                    if is_oom_error(e):
+                        gc.collect()
+                        torch.cuda.empty_cache()
+                        r = m - 1
+                    else:
+                        raise
+            return curr_max_batch_size
+        max_batch_size = find_max_batch_size_binary_search()
+        if max_batch_size < 0:
+            raise RuntimeError("No executable batch size found")
+        logger.info(f"##### Found max batch size={max_batch_size}")
+        return function(max_batch_size, *args, **kwargs)
+    return decorator
 
 class FSDPOption(ExplicitEnum):
     FULL_SHARD = "full_shard"

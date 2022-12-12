@@ -123,6 +123,7 @@ from .trainer_utils import (
     denumpify_detensorize,
     enable_full_determinism,
     find_executable_batch_size,
+    find_max_batch_size,
     get_last_checkpoint,
     has_length,
     number_of_arguments,
@@ -631,7 +632,7 @@ class Trainer:
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
 
         # Internal variables to keep track of the original batch size
-        self._train_batch_size = args.train_batch_size
+        self._train_batch_size = args.train_batch_size # total batch size
 
         # very last
         self._memory_tracker.stop_and_update_metrics()
@@ -1541,7 +1542,7 @@ class Trainer:
                 self._move_model_to_device(self.model, args.device)
             self.model_wrapped = self.model
 
-        inner_training_loop = find_executable_batch_size(
+        inner_training_loop = find_max_batch_size(
             self._inner_training_loop, self._train_batch_size, args.auto_find_batch_size
         )
         return inner_training_loop(
@@ -1554,7 +1555,9 @@ class Trainer:
     def _inner_training_loop(
         self, batch_size=None, args=None, resume_from_checkpoint=None, trial=None, ignore_keys_for_eval=None
     ):
-        self._train_batch_size = batch_size
+        # batch_size has been reset, possibly from find_max_batch_size or find_executable_batch_size
+        if self._train_batch_size != batch_size:
+            self._train_batch_size = batch_size
         # Data loader and number of training steps
         train_dataloader = self.get_train_dataloader()
 
@@ -1562,7 +1565,8 @@ class Trainer:
         # number of training epochs: num_train_epochs
         # number of training steps per epoch: num_update_steps_per_epoch
         # total number of training steps to execute: max_steps
-        total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+        # total_train_batch_size = args.train_batch_size * args.gradient_accumulation_steps * args.world_size
+        total_train_batch_size = self._train_batch_size * args.gradient_accumulation_steps * args.world_size
 
         len_dataloader = None
         if has_length(train_dataloader):
@@ -1654,7 +1658,7 @@ class Trainer:
         logger.info("***** Running training *****")
         logger.info(f"  Num examples = {num_examples}")
         logger.info(f"  Num Epochs = {num_train_epochs}")
-        logger.info(f"  Instantaneous batch size per device = {args.per_device_train_batch_size}")
+        logger.info(f"  Instantaneous batch size per device = {self._train_batch_size}")
         logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_train_batch_size}")
         logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
         logger.info(f"  Total optimization steps = {max_steps}")
